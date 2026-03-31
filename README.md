@@ -29,8 +29,4 @@ recon/
 
 
 
-23:59 month-end, orphan = refund with no valid original_txn_id in dataset.
 
-Generate synthetic data with exactly one of each gap type. State all assumptions.
-Return engine.js, seed.js, run.js, tests/engine.test.js.
-```
