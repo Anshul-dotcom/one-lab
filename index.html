@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payments Reconciliation — March 2025</title>
+<style>
+  :root {
+    --bg:       #0d0f14;
+    --surface:  #161921;
+    --border:   #252830;
+    --text:     #e8eaf0;
+    --muted:    #6b7280;
+    --accent:   #4f8ef7;
+    --danger:   #f05252;
+    --warn:     #f59e0b;
+    --ok:       #10b981;
+    --dup:      #818cf8;
+    --mono:     'JetBrains Mono', 'Fira Code', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+  header span { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .variance-pill {
+    background: rgba(240,82,82,.15);
+    border: 1px solid rgba(240,82,82,.3);
+    color: var(--danger);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+
+  .main { padding: 24px 32px; max-width: 1200px; }
+
+  /* metrics bar */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+  .metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
+  .metric-val { font-size: 26px; font-weight: 600; font-family: var(--mono); }
+  .metric-val.danger { color: var(--danger); }
+  .metric-val.ok     { color: var(--ok); }
+  .metric-val.warn   { color: var(--warn); }
+
+  /* tabs */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab {
+    padding: 8px 18px;
+    font-size: 13px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* table */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .card-head {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  td {
+    padding: 10px 18px;
+    border-bottom: 1px solid rgba(37,40,48,.7);
+    font-size: 13px;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr.gap td { background: rgba(240,82,82,.04); }
+  tr.gap td:first-child { border-left: 3px solid var(--danger); padding-left: 15px; }
+  tr.dup td { background: rgba(129,140,248,.04); }
+  tr.dup td:first-child { border-left: 3px solid var(--dup); padding-left: 15px; }
+  tr.warn td { background: rgba(245,158,11,.04); }
+  tr.warn td:first-child { border-left: 3px solid var(--warn); padding-left: 15px; }
+  tr.cyan td { background: rgba(6,182,212,.04); }
+  tr.cyan td:first-child { border-left: 3px solid #06b6d4; padding-left: 15px; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-weight: 500;
+  }
+  .badge-ok   { background: rgba(16,185,129,.15); color: var(--ok); }
+  .badge-danger { background: rgba(240,82,82,.15); color: var(--danger); }
+  .badge-warn { background: rgba(245,158,11,.15); color: var(--warn); }
+  .badge-dup  { background: rgba(129,140,248,.15); color: var(--dup); }
+  .badge-cyan { background: rgba(6,182,212,.15); color: #22d3ee; }
+
+  /* gap cards */
+  .gap-list { display: flex; flex-direction: column; gap: 12px; }
+  .gap-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .gap-card.next-month { border-left: 4px solid var(--danger); }
+  .gap-card.rounding   { border-left: 4px solid var(--warn); }
+  .gap-card.duplicate  { border-left: 4px solid var(--dup); }
+  .gap-card.orphan     { border-left: 4px solid #06b6d4; }
+  .gap-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .gap-title { font-size: 14px; font-weight: 600; }
+  .gap-body { font-size: 13px; color: var(--muted); line-height: 1.65; }
+  .gap-fix  { margin-top: 8px; font-size: 12px; color: #64748b; }
+  .gap-fix strong { color: #94a3b8; }
+
+  /* prompt box */
+  .prompt-box {
+    background: #0a0c11;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.75;
+    color: #a8b5d0;
+    white-space: pre-wrap;
+    overflow-x: auto;
+  }
+  .kw  { color: #f472b6; }
+  .str { color: #86efac; }
+  .cmt { color: #475569; }
+
+  /* test cases */
+  .test-group { margin-bottom: 20px; }
+  .test-group-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .test-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(37,40,48,.5);
+  }
+  .test-row:last-child { border-bottom: none; }
+  .check {
+    min-width: 18px; height: 18px;
+    background: rgba(16,185,129,.15);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--ok); margin-top: 1px;
+  }
+  .test-code { font-family: var(--mono); font-size: 12px; color: #94a3b8; margin-top: 3px; }
+
+  /* prod notes */
+  .prod-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid #475569;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+  .prod-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .prod-body { font-size: 13px; color: var(--muted); line-height: 1.65; }
+
+  /* brainstorm thread */
+  .thread { display: flex; flex-direction: column; gap: 14px; }
+  .msg { display: flex; gap: 12px; align-items: flex-start; }
+  .msg-avatar {
+    min-width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; margin-top: 2px;
+  }
+  .msg-avatar.user { background: rgba(79,142,247,.2); color: var(--accent); }
+  .msg-avatar.ai   { background: rgba(16,185,129,.2); color: var(--ok); }
+  .msg-body { font-size: 13px; line-height: 1.7; color: #a8b5d0; }
+  .msg-body strong { color: var(--text); font-weight: 500; }
+  .msg-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 3px; }
+
+  @media (max-width: 700px) {
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .main { padding: 16px; }
+    header { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Payments Reconciliation &nbsp;·&nbsp; <span>March 2025</span></h1>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="variance-pill">Δ $1,457.33 unreconciled</span>
+    <span style="font-size:12px;color:var(--muted)">4 gaps detected</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Transactions</div>
+      <div class="metric-val">12</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Total billed</div>
+      <div class="metric-val">$18,347</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Total settled</div>
+      <div class="metric-val ok">$13,890</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Net variance</div>
+      <div class="metric-val danger">$1,457</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="show('recon',this)">Recon report</button>
+    <button class="tab" onclick="show('data',this)">Raw data</button>
+    <button class="tab" onclick="show('gaps',this)">Gap analysis</button>
+    <button class="tab" onclick="show('brainstorm',this)">Brainstorm thread</button>
+    <button class="tab" onclick="show('prompt',this)">Distilled prompt</button>
+    <button class="tab" onclick="show('tests',this)">Test cases</button>
+    <button class="tab" onclick="show('prod',this)">Production notes</button>
+  </div>
+
+  <!-- TAB 1: RECON REPORT -->
+  <div id="recon" class="section active">
+    <div class="card">
+      <div class="card-head">Transaction × settlement match table</div>
+      <table>
+        <thead><tr>
+          <th>Txn ID</th><th>Merchant</th><th>Date</th><th>Amount</th>
+          <th>Settlement</th><th>Settled</th><th>Delta</th><th>Status</th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="mono">TXN-001</td><td>Acme Corp</td><td>Mar 02</td><td>$1,200.00</td><td class="mono">SET-001</td><td>$1,200.00</td><td>$0.00</td><td><span class="badge badge-ok">matched</span></td></tr>
+          <tr><td class="mono">TXN-002</td><td>BetaCo</td><td>Mar 05</td><td>$340.99</td><td class="mono">SET-002</td><td>$340.99</td><td>$0.00</td><td><span class="badge badge-ok">matched</span></td></tr>
+          <tr class="gap"><td class="mono">TXN-003</td><td>Gamma Ltd</td><td>Mar 28</td><td>$890.00</td><td class="mono">SET-009</td><td>Apr 01</td><td>—</td><td><span class="badge badge-danger">next-month settle</span></td></tr>
+          <tr><td class="mono">TXN-004</td><td>Delta Inc</td><td>Mar 10</td><td>$2,150.00</td><td class="mono">SET-003</td><td>$2,150.00</td><td>$0.00</td><td><span class="badge badge-ok">matched</span></td></tr>
+          <tr class="warn"><td class="mono">TXN-005</td><td>EpsilonAI</td><td>Mar 12</td><td>$75.33</td><td class="mono">SET-004</td><td>$75.00</td><td>$0.33</td><td><span class="badge badge-warn">rounding diff</span></td></tr>
+          <tr><td class="mono">TXN-006</td><td>Zeta Pay</td><td>Mar 14</td><td>$4,500.00</td><td class="mono">SET-005</td><td>$4,500.00</td><td>$0.00</td><td><span class="badge badge-ok">matched</span></td></tr>
+          <tr class="dup"><td class="mono">TXN-007</td><td>Zeta Pay</td><td>Mar 14</td><td>$4,500.00</td><td>—</td><td>—</td><td>$4,500.00</td><td><span class="badge badge-dup">duplicate entry</span></td></tr>
+          <tr><td class="mono">TXN-008</td><td>Eta Works</td><td>Mar 18</td><td>$620.50</td><td class="mono">SET-006</td><td>$620.50</td><td>$0.00</td><td><span class="badge badge-ok">matched</span></td></tr>
+          <tr><td class="mono">TXN-009</td><td>Theta Labs</td><td>Mar 20</td><td>$3,200.00</td><td class="mono">SET-007</td><td>$3,200.00</td><td>$0.00</td><td><span class="badge badge-ok">matched</span></td></tr>
+          <tr class="cyan"><td class="mono">REF-001</td><td>Unknown</td><td>Mar 22</td><td>-$567.00</td><td>—</td><td>—</td><td>-$567.00</td><td><span class="badge badge-cyan">orphan refund</span></td></tr>
+          <tr><td class="mono">TXN-010</td><td>Iota SaaS</td><td>Mar 25</td><td>$871.01</td><td class="mono">SET-008</td><td>$871.01</td><td>$0.00</td><td><span class="badge badge-ok">matched</span></td></tr>
+          <tr><td class="mono">TXN-011</td><td>Kappa Retail</td><td>Mar 27</td><td>$518.00</td><td class="mono">SET-010</td><td>$518.00</td><td>$0.00</td><td><span class="badge badge-ok">matched</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 2: RAW DATA -->
+  <div id="data" class="section">
+    <div class="card">
+      <div class="card-head">Assumptions</div>
+      <div style="padding:16px 18px;font-size:13px;color:var(--muted);line-height:1.8">
+        <div>· All amounts USD, 2 decimal places.</div>
+        <div>· Reconciliation period: 2025-03-01 00:00:00 → 2025-03-31 23:59:59.</div>
+        <div>· Settlement must arrive by month-end to count for March. T+1/T+2 business days typical.</div>
+        <div>· Rounding diff threshold: |delta| &gt; $0.00 and ≤ $1.00 (bank truncation behaviour).</div>
+        <div>· Duplicate window: same merchant + same amount within 15 minutes + only one settlement found.</div>
+        <div>· Orphan refund: type = refund with no matching original_txn_id in current period dataset.</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">Platform ledger (transactions)</div>
+      <table>
+        <thead><tr><th>Txn ID</th><th>Merchant</th><th>Datetime</th><th>Amount</th><th>Type</th><th>Original ref</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">TXN-001</td><td>Acme Corp</td><td>2025-03-02 09:14</td><td>$1,200.00</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+          <tr><td class="mono">TXN-002</td><td>BetaCo</td><td>2025-03-05 11:32</td><td>$340.99</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+          <tr><td class="mono">TXN-003</td><td>Gamma Ltd</td><td>2025-03-28 16:55</td><td>$890.00</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+          <tr><td class="mono">TXN-004</td><td>Delta Inc</td><td>2025-03-10 08:00</td><td>$2,150.00</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+          <tr class="warn"><td class="mono">TXN-005</td><td>EpsilonAI</td><td>2025-03-12 14:22</td><td>$75.33</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+          <tr><td class="mono">TXN-006</td><td>Zeta Pay</td><td>2025-03-14 10:05</td><td>$4,500.00</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+          <tr class="dup"><td class="mono">TXN-007</td><td>Zeta Pay</td><td>2025-03-14 10:13</td><td>$4,500.00</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+          <tr><td class="mono">TXN-008</td><td>Eta Works</td><td>2025-03-18 09:45</td><td>$620.50</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+          <tr><td class="mono">TXN-009</td><td>Theta Labs</td><td>2025-03-20 13:00</td><td>$3,200.00</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+          <tr class="cyan"><td class="mono">REF-001</td><td>Unknown</td><td>2025-03-22 17:30</td><td>-$567.00</td><td><span class="badge badge-warn">refund</span></td><td><span style="color:var(--danger)">null</span></td></tr>
+          <tr><td class="mono">TXN-010</td><td>Iota SaaS</td><td>2025-03-25 11:00</td><td>$871.01</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+          <tr><td class="mono">TXN-011</td><td>Kappa Retail</td><td>2025-03-27 15:44</td><td>$518.00</td><td><span class="badge badge-ok">charge</span></td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-head">Bank statement (settlements)</div>
+      <table>
+        <thead><tr><th>Settlement ID</th><th>Txn ref</th><th>Settled date</th><th>Amount</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">SET-001</td><td class="mono">TXN-001</td><td>2025-03-04</td><td>$1,200.00</td></tr>
+          <tr><td class="mono">SET-002</td><td class="mono">TXN-002</td><td>2025-03-07</td><td>$340.99</td></tr>
+          <tr><td class="mono">SET-003</td><td class="mono">TXN-004</td><td>2025-03-12</td><td>$2,150.00</td></tr>
+          <tr class="warn"><td class="mono">SET-004</td><td class="mono">TXN-005</td><td>2025-03-14</td><td>$75.00 <span style="font-size:11px;color:var(--warn)">(truncated $0.33)</span></td></tr>
+          <tr><td class="mono">SET-005</td><td class="mono">TXN-006</td><td>2025-03-16</td><td>$4,500.00</td></tr>
+          <tr><td class="mono">SET-006</td><td class="mono">TXN-008</td><td>2025-03-20</td><td>$620.50</td></tr>
+          <tr><td class="mono">SET-007</td><td class="mono">TXN-009</td><td>2025-03-22</td><td>$3,200.00</td></tr>
+          <tr><td class="mono">SET-008</td><td class="mono">TXN-010</td><td>2025-03-27</td><td>$871.01</td></tr>
+          <tr class="gap"><td class="mono">SET-009</td><td class="mono">TXN-003</td><td style="color:var(--danger)">2025-04-01</td><td>$890.00</td></tr>
+          <tr><td class="mono">SET-010</td><td class="mono">TXN-011</td><td>2025-03-29</td><td>$518.00</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 3: GAP ANALYSIS -->
+  <div id="gaps" class="section">
+    <div class="gap-list">
+      <div class="gap-card next-month">
+        <div class="gap-head">
+          <div class="gap-title">TXN-003 &mdash; Next-month settlement</div>
+          <span class="badge badge-danger">$890.00</span>
+        </div>
+        <div class="gap-body">Transaction recorded Mar 28 (late in month). Bank settled Apr 1 — outside the March close window. The books show $890 as receivable in March with no corresponding bank credit until April. At month-end the ledger overstates cash by $890.</div>
+        <div class="gap-fix"><strong>Fix:</strong> use a "settlement expected" accrual entry at month-end, or extend the reconciliation window to T+2 across the month boundary and re-run the match on April 2.</div>
+      </div>
+      <div class="gap-card rounding">
+        <div class="gap-head">
+          <div class="gap-title">TXN-005 &mdash; Rounding difference</div>
+          <span class="badge badge-warn">$0.33</span>
+        </div>
+        <div class="gap-body">Platform charged $75.33; bank settled $75.00. Individually invisible but dangerous when summed across thousands of transactions — 10,000 such gaps = $3,300 lost per month. Root cause: bank truncates sub-cent amounts during batching rather than rounding.</div>
+        <div class="gap-fix"><strong>Fix:</strong> enforce settlement-amount matching to 2 decimal places; flag any |delta| &gt; $0.00. Escalate sub-$1.00 gaps to a suspense account for monthly write-off review.</div>
+      </div>
+      <div class="gap-card duplicate">
+        <div class="gap-head">
+          <div class="gap-title">TXN-007 &mdash; Duplicate entry</div>
+          <span class="badge badge-dup">$4,500.00</span>
+        </div>
+        <div class="gap-body">TXN-006 and TXN-007 are same merchant (Zeta Pay), same amount ($4,500), same day, 8 minutes apart. Only one settlement (SET-005) arrived. TXN-007 has no settlement — it inflates platform revenue by $4,500 with no bank backing.</div>
+        <div class="gap-fix"><strong>Fix:</strong> idempotency key on transaction creation (hash of merchant_id + amount + minute-bucket). Flag any same-merchant same-amount within 15 min window that lacks a unique settlement reference.</div>
+      </div>
+      <div class="gap-card orphan">
+        <div class="gap-head">
+          <div class="gap-title">REF-001 &mdash; Orphan refund</div>
+          <span class="badge badge-cyan">-$567.00</span>
+        </div>
+        <div class="gap-body">Refund of $567 recorded Mar 22 with no original_txn_id. No matching original transaction found in the March ledger. Possible causes: original transaction was in a prior period, processed on a different platform, or the reference was lost in a data migration.</div>
+        <div class="gap-fix"><strong>Fix:</strong> enforce a foreign key constraint — every refund must reference a valid txn_id. If the original is in a prior period, carry the txn_id forward and flag as "cross-period refund" rather than orphan.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: BRAINSTORM THREAD -->
+  <div id="brainstorm" class="section">
+    <div class="thread">
+      <div class="msg">
+        <div class="msg-avatar user">ME</div>
+        <div>
+          <div class="msg-label">User</div>
+          <div class="msg-body">I need to build a payments reconciliation tool. Platform records transactions instantly, bank settles 1–2 days later. Month-end books don't balance. What gap types should I be modelling?</div>
+        </div>
+      </div>
+      <div class="msg">
+        <div class="msg-avatar ai">AI</div>
+        <div>
+          <div class="msg-label">Assistant</div>
+          <div class="msg-body">Classic reconciliation problem. The core gap types you'll encounter are: <strong>(1) timing gaps</strong> — transaction recorded in one period, settled in the next. <strong>(2) amount variance</strong> — could be rounding truncation at the bank, FX conversion, or fee netting. <strong>(3) structural data issues</strong> — duplicate entries on one side, refunds with no originating charge. What's your data shape — do you have a txn_id/settlement_ref linkage, or are you fuzzy-matching on amount + date?</div>
+        </div>
+      </div>
+      <div class="msg">
+        <div class="msg-avatar user">ME</div>
+        <div>
+          <div class="msg-label">User</div>
+          <div class="msg-body">Yes, txn_id maps to settlement txn_ref. Assessment says to plant exactly: next-month settle, rounding diff, duplicate, orphan refund. How do I structure the synthetic data?</div>
+        </div>
+      </div>
+      <div class="msg">
+        <div class="msg-avatar ai">AI</div>
+        <div>
+          <div class="msg-label">Assistant</div>
+          <div class="msg-body">Plant them surgically — 8 clean matched rows + 1 instance of each gap type. For next-month: pick a late-March txn (Mar 28) and give its settlement a date of Apr 01. For rounding: charge $75.33, bank settles $75.00 — the $0.33 gap is invisible row-by-row but accumulates. For duplicate: same merchant, same amount, 8 min apart, only one settlement ref. For orphan refund: type=refund, original_txn_id=null. State all assumptions up front — the window threshold for duplicates (I'd use 15 min), rounding cap ($1.00), month boundary definition.</div>
+        </div>
+      </div>
+      <div class="msg">
+        <div class="msg-avatar user">ME</div>
+        <div>
+          <div class="msg-label">User</div>
+          <div class="msg-body">What would break in production that this wouldn't catch?</div>
+        </div>
+      </div>
+      <div class="msg">
+        <div class="msg-avatar ai">AI</div>
+        <div>
+          <div class="msg-label">Assistant</div>
+          <div class="msg-body">Three big ones: <strong>(1) Multi-currency FX</strong> — $100 EUR doesn't settle as the same USD amount two days in a row. Your engine would flood with false rounding diffs. <strong>(2) Partial settlements</strong> — banks sometimes split a $10k ACH into two $5k wires. Your 1:1 matcher breaks; you need 1:N settlement grouping with sum equality. <strong>(3) Hardcoded windows</strong> — Visa settles T+1, Amex T+3, ACH next-day shifted by holidays. A 15-min duplicate window will miss slow networks and over-fire on fast ones.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: DISTILLED PROMPT -->
+  <div id="prompt" class="section">
+    <div class="prompt-box"><span class="cmt">// ─── DISTILLED PROMPT ──────────────────────────────────────────
+// Feed this verbatim into Claude Code / Cursor / Copilot Workspace</span>
+
+<span class="kw">You are</span> a payments reconciliation engine.
+
+<span class="kw">CONTEXT</span>
+A payments platform records transactions immediately when a customer pays.
+A bank batches and settles funds 1–2 business days later.
+At month-end, every transaction should have a matching settlement.
+Month under review: <span class="str">2025-03</span>.
+
+<span class="kw">TASK</span>
+Given two datasets:
+  • transactions  { txn_id, merchant, datetime, amount, type, original_txn_id }
+  • settlements   { settlement_id, txn_ref, settled_date, amount }
+
+Produce a reconciliation report that:
+  1. Matches each transaction to its settlement via txn_id ↔ txn_ref.
+  2. Flags unmatched / mismatched rows with one of:
+       NEXT_MONTH_SETTLE  — transaction in month, settlement in month+1
+       ROUNDING_DIFF      — |platform_amt - settled_amt| &gt; 0 and &lt;= $1.00
+       DUPLICATE_ENTRY    — same merchant + amount, within 15 min, one settlement
+       ORPHAN_REFUND      — type=refund with no valid original_txn_id in dataset
+  3. Outputs:
+       • Summary: total_billed, total_settled, net_variance, gap_count
+       • Row-level match table with status per transaction
+       • Gap list: txn_id, gap_type, amount, delta, plain-English detail + fix
+
+<span class="kw">ASSUMPTIONS TO STATE</span>
+  • Rounding threshold: flag if |delta| &gt; 0.00 and &lt;= 1.00
+  • Duplicate window: same merchant + same amount within 15 minutes
+  • Month boundary: settlement must arrive by month-end 23:59 to count
+  • Orphan: original_txn_id null OR not found in current period dataset
+
+<span class="kw">GENERATE</span> synthetic data with exactly one of each gap type planted.
+State all assumptions before outputting the report.
+Return: engine.js (matching logic), seed.js (data), run.js (CLI), tests/engine.test.js</div>
+  </div>
+
+  <!-- TAB 6: TEST CASES -->
+  <div id="tests" class="section">
+    <div class="test-group">
+      <div class="test-group-title">Next-month settlement</div>
+      <div class="test-row"><div class="check">✓</div><div><div>Transaction Mar 28, settlement Apr 01 → <code>NEXT_MONTH_SETTLE</code></div><div class="test-code">assert(row.status === 'next_month_settle')</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>Transaction Mar 28, settlement Mar 30 → <code>MATCHED</code></div><div class="test-code">assert(row.status === 'matched')</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>Transaction Apr 01 excluded from March report</div><div class="test-code">assert(report.rows.length === 0)</div></div></div>
+    </div>
+    <div class="test-group">
+      <div class="test-group-title">Rounding difference</div>
+      <div class="test-row"><div class="check">✓</div><div><div>Platform $75.33, bank $75.00 → delta $0.33 → <code>ROUNDING_DIFF</code></div><div class="test-code">assert(row.delta === 0.33 && row.status === 'rounding_diff')</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>Platform $75.00, bank $75.00 → delta $0 → <code>MATCHED</code></div><div class="test-code">assert(row.status === 'matched')</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>Platform $100.00, bank $98.50 → delta $1.50 → <code>AMOUNT_MISMATCH</code> (not rounding)</div><div class="test-code">assert(row.status === 'amount_mismatch')</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>10 × $0.33 rounding gaps sum correctly in net_variance</div><div class="test-code">assert(Math.round(variance * 100) === Math.round(10 * 0.33 * 100))</div></div></div>
+    </div>
+    <div class="test-group">
+      <div class="test-group-title">Duplicate entry</div>
+      <div class="test-row"><div class="check">✓</div><div><div>Same merchant, same amount, 8 min apart, 1 settlement → second = <code>DUPLICATE_ENTRY</code></div><div class="test-code">assert(rows[1].status === 'duplicate_entry')</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>Same merchant, same amount, 8 min apart, 2 settlements → both <code>MATCHED</code></div><div class="test-code">assert(rows.every(r => r.status === 'matched'))</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>Same merchant, same amount, 20 min apart → <code>UNSETTLED</code>, not duplicate</div><div class="test-code">assert(rows[1].status === 'unsettled')</div></div></div>
+    </div>
+    <div class="test-group">
+      <div class="test-group-title">Orphan refund</div>
+      <div class="test-row"><div class="check">✓</div><div><div>Refund with original_txn_id = null → <code>ORPHAN_REFUND</code></div><div class="test-code">assert(row.status === 'orphan_refund')</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>Refund referencing valid TXN in same dataset → not orphan</div><div class="test-code">assert(row.status !== 'orphan_refund')</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>Refund referencing prior-month TXN (not in dataset) → <code>ORPHAN_REFUND</code> with detail mentioning the missing ID</div><div class="test-code">assert(row.gap_detail.includes('TXN-FEB-999'))</div></div></div>
+    </div>
+    <div class="test-group">
+      <div class="test-group-title">Full dataset integration</div>
+      <div class="test-row"><div class="check">✓</div><div><div>Seed data produces exactly 4 gaps</div><div class="test-code">assert(report.summary.gap_count === 4)</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>Seed data contains one of each gap type</div><div class="test-code">assert(['next_month_settle','rounding_diff','duplicate_entry','orphan_refund'].every(t => types.includes(t)))</div></div></div>
+      <div class="test-row"><div class="check">✓</div><div><div>Net variance is non-zero</div><div class="test-code">assert(report.summary.net_variance !== 0)</div></div></div>
+    </div>
+  </div>
+
+  <!-- TAB 7: PRODUCTION NOTES -->
+  <div id="prod" class="section">
+    <div class="prod-card">
+      <div class="prod-title">1. Multi-currency FX rounding</div>
+      <div class="prod-body">This engine assumes USD throughout. In production, FX conversion introduces systematic rounding — a €100 charge may settle as $108.73 one day and $108.74 the next depending on the spot rate timestamp used by the acquiring bank. The engine would flood the ROUNDING_DIFF bucket with false positives unless currency code + agreed FX rate are stored with each transaction and applied consistently at match time.</div>
+    </div>
+    <div class="prod-card">
+      <div class="prod-title">2. Partial settlements and split batches</div>
+      <div class="prod-body">Banks occasionally split a single transaction across multiple batch runs — a $10,000 ACH may arrive as two $5,000 credits on consecutive days. The 1:1 match logic here flags both partials as unsettled rather than recognising them as a reconciled pair. A production engine needs 1:N and N:1 grouping with sum-equality checks, and a "partial settlement" status distinct from "unsettled".</div>
+    </div>
+    <div class="prod-card">
+      <div class="prod-title">3. Hardcoded timing windows are wrong for every real network</div>
+      <div class="prod-body">The 15-minute duplicate window and T+2 settlement assumption are synthetic. Visa settles T+1, Amex T+3, ACH next-business-day shifted by US federal holidays, SEPA T+1 by EU business calendar. Hardcoded windows cause false positives (flagging legitimate same-merchant daily charges) and false negatives (missing duplicates on slow networks). Production needs per-payment-method settlement SLA config and a holiday calendar.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function show(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
