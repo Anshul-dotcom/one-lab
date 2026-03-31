@@ -542,5 +542,16 @@ function show(id, btn) {
   btn.classList.add('active');
 }
 </script>
+<button onclick="run()">Run Report</button>
+
+<pre id="output"></pre>
+
+<script>
+async function run() {
+  const res = await fetch('/run');
+  const data = await res.text();
+  document.getElementById('output').innerText = data;
+}
+</script>
 </body>
 </html>
